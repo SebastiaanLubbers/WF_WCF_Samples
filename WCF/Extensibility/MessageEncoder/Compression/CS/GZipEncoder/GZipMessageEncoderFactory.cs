@@ -1,4 +1,4 @@
-﻿//----------------------------------------------------------------
+//----------------------------------------------------------------
 // Copyright (c) Microsoft Corporation.  All rights reserved.
 //----------------------------------------------------------------
 
@@ -150,20 +150,28 @@ namespace Microsoft.Samples.GZipEncoder
                 //This will ensure that the inner stream gets closed when the message gets closed, which
                 //will ensure that resources are available for reuse/release.
                 GZipStream gzStream = new GZipStream(stream, CompressionMode.Decompress, false);
-                return innerEncoder.ReadMessage(gzStream, maxSizeOfHeaders);
+
+                Message messageResult = innerEncoder.ReadMessage(gzStream, maxSizeOfHeaders);
+
+                gzStream.Dispose();
+
+                return messageResult;
             }
 
             public override void WriteMessage(Message message, System.IO.Stream stream)
             {
-                using (GZipStream gzStream = new GZipStream(stream, CompressionMode.Compress, true))
+                MemoryStream compactedStream = new MemoryStream();
+
+                using (GZipStream gzStream = new GZipStream(compactedStream, CompressionMode.Compress, true))
                 {
                     innerEncoder.WriteMessage(message, gzStream);
                 }
 
-                // innerEncoder.WriteMessage(message, gzStream) depends on that it can flush data by flushing 
-                // the stream passed in, but the implementation of GZipStream.Flush will not flush underlying
-                // stream, so we need to flush here.
-                stream.Flush();
+                byte[] compactBuffer = compactedStream.GetBuffer();
+
+                compactedStream.Dispose();
+
+                stream.Write(compactBuffer, 0, compactBuffer.Length);
             }
         }
     }
